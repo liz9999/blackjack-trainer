@@ -10,22 +10,28 @@ import { gameStore } from './store.js';
 import { Deck, Hand } from './game/index.js';
 import './styles.scss';
 
+interface HandInfo {
+  hand: Hand;
+  hasHit: boolean;
+  isCompleted: boolean;
+}
+
 const GameContent: React.FC = () => {
   const { gameState } = useGameState();
   const [deck] = useState(() => new Deck(6));
-  const [playerHand] = useState(() => new Hand());
   const [dealerHand] = useState(() => new Hand());
-  const [splitHand, setSplitHand] = useState<Hand | undefined>();
-  const [currentHand, setCurrentHand] = useState<'main' | 'split'>('main');
-  const [canSplit, setCanSplit] = useState(false);
-  const [hasHit, setHasHit] = useState({ main: false, split: false });
+  const [hands, setHands] = useState<HandInfo[]>([]);
+  const [currentHandIndex, setCurrentHandIndex] = useState(0);
   const [insuranceBet, setInsuranceBet] = useState(0);
   const [showInsurance, setShowInsurance] = useState(false);
   const [isEvenMoney, setIsEvenMoney] = useState(false);
   const [deckCount, setDeckCount] = useState(6);
+  const [endGameTimeoutId, setEndGameTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [dealerCardRevealed, setDealerCardRevealed] = useState(false);
 
   useEffect(() => {
     gameStore.setState({
+      state: 'betting', // Ensure we start in betting state
       currentBet: 25,
       lastBet: 25,
       stats: {
@@ -43,46 +49,66 @@ const GameContent: React.FC = () => {
       return;
     }
 
+    // Clear any existing end game timeout
+    if (endGameTimeoutId) {
+      clearTimeout(endGameTimeoutId);
+      setEndGameTimeoutId(null);
+    }
+
+    // Clear previous game display
     gameStore.setState({
       balance: state.balance - state.currentBet,
-      state: 'playing'
+      state: 'playing',
+      playerHand: [],
+      playerValue: 0,
+      dealerHand: [],
+      dealerValue: 0
     });
 
-    playerHand.clear();
+    // Initialize with one hand
+    const initialHand = new Hand();
     dealerHand.clear();
-    setSplitHand(undefined);
-    setCurrentHand('main');
-    setCanSplit(false);
-    setHasHit({ main: false, split: false });
+    setHands([{ hand: initialHand, hasHit: false, isCompleted: false }]);
+    setCurrentHandIndex(0);
     setInsuranceBet(0);
     setShowInsurance(false);
+    setDealerCardRevealed(false); // Reset dealer card reveal flag
 
     // Deal initial cards
-    dealCardToPlayer();
+    dealCardToHand(initialHand);
     dealCardToDealer();
-    dealCardToPlayer();
+    dealCardToHand(initialHand);
     dealCardToDealer(true);
-
-    // Check for split possibility
-    const playerCards = playerHand.getCards();
-    if (playerCards.length === 2 && playerCards[0].rank === playerCards[1].rank) {
-      setCanSplit(true);
-    }
 
     updateGameDisplay();
 
-    // Check for insurance
+    // Check for player blackjack first using the newly dealt hand
+    const playerHasBlackjack = initialHand.isBlackjack();
     const dealerUpCard = dealerHand.getCards()[0];
-    if (dealerUpCard.rank === 'A') {
+
+    if (playerHasBlackjack && dealerUpCard.rank === 'A') {
+      // Player has blackjack, dealer shows Ace - offer even money
+      offerInsurance();
+      return;
+    } else if (playerHasBlackjack && dealerUpCard.rank !== 'A') {
+      // Player has blackjack, dealer doesn't show Ace - auto win
+      revealDealerCard();
+      updateGameDisplay();
+
+      const dealerHasBlackjack = dealerHand.isBlackjack();
+      if (dealerHasBlackjack) {
+        endGame(gameState.currentBet, 0, 'Push - Both blackjack');
+      } else {
+        endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!');
+      }
+      return;
+    } else if (dealerUpCard.rank === 'A') {
+      // No player blackjack, dealer shows Ace - offer insurance
       offerInsurance();
       return;
     }
 
-    checkForBlackjacks();
-  };
-
-  const dealCardToPlayer = () => {
-    dealCardToHand(playerHand);
+    // No blackjacks or insurance needed - game continues normally
   };
 
   const dealCardToHand = (hand: Hand) => {
@@ -116,24 +142,62 @@ const GameContent: React.FC = () => {
     });
   };
 
+  const canCurrentHandSplit = (): boolean => {
+    if (hands.length >= 4) return false; // Max 4 hands
+    const currentHand = hands[currentHandIndex];
+    if (!currentHand || currentHand.hasHit) return false;
+
+    const cards = currentHand.hand.getCards();
+    return cards.length === 2 && cards[0].rank === cards[1].rank;
+  };
+
   const hit = () => {
     const state = gameStore.getState();
-    if (state.state !== 'playing') return;
+    if (state.state !== 'playing' || currentHandIndex >= hands.length) return;
 
-    const hand = currentHand === 'main' ? playerHand : splitHand;
-    if (!hand) return;
+    const currentHandInfo = hands[currentHandIndex];
+    if (!currentHandInfo || currentHandInfo.isCompleted) return;
 
-    setHasHit(prev => ({ ...prev, [currentHand]: true }));
-    dealCardToHand(hand);
+    // Mark as having hit
+    const updatedHands = [...hands];
+    updatedHands[currentHandIndex] = {
+      ...currentHandInfo,
+      hasHit: true
+    };
+    setHands(updatedHands);
+
+    dealCardToHand(currentHandInfo.hand);
     updateGameDisplay();
 
-    if (hand.isBusted()) {
-      if (splitHand && currentHand === 'main') {
-        setCurrentHand('split');
-        updateGameDisplay();
+    if (currentHandInfo.hand.isBusted()) {
+      // Complete current hand and move to next
+      updatedHands[currentHandIndex] = {
+        ...updatedHands[currentHandIndex],
+        isCompleted: true
+      };
+      setHands(updatedHands);
+
+      // If this is the only hand or last hand, end the game immediately
+      if (hands.length === 1 || currentHandIndex === hands.length - 1) {
+        setTimeout(() => {
+          determineWinner();
+        }, 1000); // Small delay to show the bust
       } else {
-        endGame('bust');
+        moveToNextHand();
       }
+    } else if (currentHandInfo.hand.getValue() === 21) {
+      // Auto-stand on 21 and reveal dealer card
+      updatedHands[currentHandIndex] = {
+        ...updatedHands[currentHandIndex],
+        isCompleted: true
+      };
+      setHands(updatedHands);
+
+      // Reveal dealer's hole card when player gets 21
+      revealDealerCard();
+      updateGameDisplay();
+
+      moveToNextHand();
     }
   };
 
@@ -141,10 +205,24 @@ const GameContent: React.FC = () => {
     const state = gameStore.getState();
     if (state.state !== 'playing') return;
 
-    if (splitHand && currentHand === 'main') {
-      setCurrentHand('split');
+    // Complete current hand
+    const updatedHands = [...hands];
+    updatedHands[currentHandIndex] = {
+      ...updatedHands[currentHandIndex],
+      isCompleted: true
+    };
+    setHands(updatedHands);
+
+    moveToNextHand();
+  };
+
+  const moveToNextHand = () => {
+    const nextIndex = currentHandIndex + 1;
+    if (nextIndex < hands.length) {
+      setCurrentHandIndex(nextIndex);
       updateGameDisplay();
     } else {
+      // All hands complete, dealer plays
       gameStore.setState({ state: 'dealer-turn' });
       revealDealerCard();
       dealerPlay();
@@ -155,61 +233,78 @@ const GameContent: React.FC = () => {
     const state = gameStore.getState();
     if (state.state !== 'playing' || state.balance < state.currentBet) return;
 
+    const currentHandInfo = hands[currentHandIndex];
+    if (!currentHandInfo || currentHandInfo.hasHit) return;
+
     gameStore.setState({
       balance: state.balance - state.currentBet,
       currentBet: state.currentBet * 2
     });
 
-    const hand = currentHand === 'main' ? playerHand : splitHand;
-    if (!hand) return;
-
-    dealCardToHand(hand);
+    dealCardToHand(currentHandInfo.hand);
     updateGameDisplay();
 
-    if (hand.isBusted()) {
-      endGame('bust');
+    // Complete hand after double down
+    const updatedHands = [...hands];
+    updatedHands[currentHandIndex] = {
+      ...currentHandInfo,
+      hasHit: true,
+      isCompleted: true
+    };
+    setHands(updatedHands);
+
+    if (currentHandInfo.hand.isBusted()) {
+      moveToNextHand();
     } else {
-      if (splitHand && currentHand === 'main') {
-        setCurrentHand('split');
-        updateGameDisplay();
-      } else {
-        gameStore.setState({ state: 'dealer-turn' });
-        revealDealerCard();
-        dealerPlay();
-      }
+      moveToNextHand();
     }
   };
 
   const split = () => {
     const state = gameStore.getState();
-    if (!canSplit || state.state !== 'playing' || state.balance < state.currentBet) return;
+    if (!canCurrentHandSplit() || state.balance < state.currentBet) return;
 
-    const newSplitHand = new Hand();
-    const playerCards = playerHand.getCards();
-    newSplitHand.addCard(playerCards[1]);
+    const currentHandInfo = hands[currentHandIndex];
+    const cards = currentHandInfo.hand.getCards();
 
-    const firstCard = playerCards[0];
-    playerHand.clear();
-    playerHand.addCard(firstCard);
+    // Create new hand with second card
+    const newHand = new Hand();
+    newHand.addCard(cards[1]);
 
+    // Keep first card in current hand
+    currentHandInfo.hand.clear();
+    currentHandInfo.hand.addCard(cards[0]);
+
+    // Deduct bet for split
     gameStore.setState({
       balance: state.balance - state.currentBet
     });
 
-    dealCardToPlayer();
-    dealCardToHand(newSplitHand);
+    // Deal new cards to both hands
+    dealCardToHand(currentHandInfo.hand);
+    dealCardToHand(newHand);
 
-    setSplitHand(newSplitHand);
-    setCanSplit(false);
+    // Insert new hand after current hand
+    const updatedHands = [...hands];
+    updatedHands.splice(currentHandIndex + 1, 0, {
+      hand: newHand,
+      hasHit: false,
+      isCompleted: false
+    });
+    setHands(updatedHands);
+
     updateGameDisplay();
   };
 
   const revealDealerCard = () => {
+    if (dealerCardRevealed) return; // Already revealed
+
     const dealerCards = dealerHand.getCards();
     if (dealerCards.length >= 2) {
       const hiddenCard = dealerCards[1];
       updateRunningCount(hiddenCard);
       gameStore.addToRecentCards(hiddenCard.toData());
+      setDealerCardRevealed(true);
     }
   };
 
@@ -217,81 +312,54 @@ const GameContent: React.FC = () => {
     while (dealerHand.getValue() < 17) {
       dealCardToDealer();
     }
+    updateGameDisplay(); // Ensure display is updated after dealer finishes
     determineWinner();
   };
 
   const determineWinner = () => {
     const dealerValue = dealerHand.getValue();
-    const playerValue = playerHand.getValue();
-    const splitValue = splitHand?.getValue() || 0;
+    const state = gameStore.getState();
+    let totalWinnings = 0;
+    let handsWon = 0;
+    const messages: string[] = [];
 
-    let result = 'lose';
+    hands.forEach((handInfo, index) => {
+      const handValue = handInfo.hand.getValue();
+      let handWinnings = 0;
 
-    if (splitHand) {
-      const mainWins = !playerHand.isBusted() && (dealerValue > 21 || playerValue > dealerValue);
-      const mainPush = !playerHand.isBusted() && playerValue === dealerValue && dealerValue <= 21;
-      const splitWins = !splitHand.isBusted() && (dealerValue > 21 || splitValue > dealerValue);
-      const splitPush = !splitHand.isBusted() && splitValue === dealerValue && dealerValue <= 21;
-
-      if (mainWins && splitWins) {
-        result = 'win-both';
-      } else if (mainWins || splitWins) {
-        result = 'win-one';
-      } else if (mainPush || splitPush) {
-        result = 'push-split';
+      if (handInfo.hand.isBusted()) {
+        messages.push(`Hand ${index + 1}: Bust!`);
+      } else if (dealerValue > 21 || handValue > dealerValue) {
+        handWinnings = state.currentBet / hands.length * 2; // Win
+        handsWon++;
+        messages.push(`Hand ${index + 1}: Win!`);
+      } else if (handValue === dealerValue) {
+        handWinnings = state.currentBet / hands.length; // Push
+        messages.push(`Hand ${index + 1}: Push`);
       } else {
-        result = 'lose';
+        messages.push(`Hand ${index + 1}: Lose`);
       }
-    } else {
-      if (playerHand.isBusted()) {
-        result = 'bust';
-      } else if (dealerValue > 21 || playerValue > dealerValue) {
-        result = 'win';
-      } else if (playerValue === dealerValue) {
-        result = 'push';
-      } else {
-        result = 'lose';
-      }
-    }
 
-    endGame(result);
+      totalWinnings += handWinnings;
+    });
+
+    endGame(totalWinnings, handsWon, messages.join(' | '));
   };
 
-  const endGame = (result: string) => {
+  const endGame = (winnings: number, handsWon: number, message: string) => {
     const state = gameStore.getState();
     const newStats = { ...state.stats };
     newStats.totalHands++;
 
-    let message = '';
-    let balanceChange = 0;
-
-    switch (result) {
-      case 'win':
-        balanceChange = state.currentBet * 2;
-        newStats.handsWon++;
-        message = 'You win!';
-        break;
-      case 'push':
-        balanceChange = state.currentBet;
-        message = 'Push!';
-        break;
-      case 'blackjack':
-        balanceChange = Math.floor(state.currentBet * 2.5);
-        newStats.handsWon++;
-        message = 'Blackjack!';
-        break;
-      case 'bust':
-        message = 'Bust! You lose!';
-        break;
-      default:
-        message = 'You lose!';
+    if (handsWon > 0) {
+      newStats.handsWon++;
     }
 
     newStats.winRate = newStats.totalHands > 0 ?
       Math.round((newStats.handsWon / newStats.totalHands) * 100) : 0;
 
     gameStore.setState({
-      balance: state.balance + balanceChange,
+      balance: state.balance + winnings,
       currentBet: state.lastBet,
       state: 'betting',
       stats: newStats
@@ -299,14 +367,15 @@ const GameContent: React.FC = () => {
 
     gameStore.setMessage(message);
 
-    setCurrentHand('main');
-    setCanSplit(false);
+    setCurrentHandIndex(0);
 
     if (deck.needsReshuffle()) {
       reshuffleDeck();
     }
 
     updateGameDisplay();
+
+    // Cards will stay visible until next hand is dealt
   };
 
   const reshuffleDeck = () => {
@@ -326,12 +395,9 @@ const GameContent: React.FC = () => {
 
   const newGame = () => {
     deck.reset();
-    playerHand.clear();
     dealerHand.clear();
-    setSplitHand(undefined);
-    setCurrentHand('main');
-    setCanSplit(false);
-    setHasHit({ main: false, split: false });
+    setHands([]);
+    setCurrentHandIndex(0);
     setInsuranceBet(0);
     setShowInsurance(false);
 
@@ -357,28 +423,30 @@ const GameContent: React.FC = () => {
   };
 
   const offerInsurance = () => {
-    const playerHasBlackjack = playerHand.isBlackjack();
+    const playerHasBlackjack = hands.length > 0 ? hands[0].hand.isBlackjack() : false;
     setIsEvenMoney(playerHasBlackjack);
     setShowInsurance(true);
   };
 
   const takeInsurance = () => {
     const state = gameStore.getState();
-    const playerHasBlackjack = playerHand.isBlackjack();
+    const playerHasBlackjack = hands.length > 0 ? hands[0].hand.isBlackjack() : false;
 
     if (playerHasBlackjack) {
       gameStore.setState({ balance: state.balance + state.currentBet });
       setShowInsurance(false);
       gameStore.setMessage('Even money taken! 1:1 payout.');
 
+      // Update display before ending game
+      updateGameDisplay();
+
       setTimeout(() => {
-        endGame('even-money');
+        endGame(state.currentBet, 1, 'Even money');
       }, 1500);
       return;
     }
 
     const insuranceCost = Math.floor(state.currentBet / 2);
-
     if (state.balance < insuranceCost) {
       gameStore.setMessage('Insufficient funds for insurance!');
       declineInsurance();
@@ -398,32 +466,33 @@ const GameContent: React.FC = () => {
   };
 
   const checkForBlackjacks = () => {
-    const playerHasBlackjack = playerHand.isBlackjack();
+    const playerHasBlackjack = hands.length > 0 ? hands[0].hand.isBlackjack() : false;
 
     revealDealerCard();
     const dealerHasBlackjack = dealerHand.isBlackjack();
 
-    if (insuranceBet > 0) {
-      if (dealerHasBlackjack) {
-        const state = gameStore.getState();
-        gameStore.setState({ balance: state.balance + (insuranceBet * 3) });
-        gameStore.setMessage('Insurance pays 2:1!', 2000);
-      }
+    // Update display to show revealed dealer card
+    updateGameDisplay();
+
+    if (insuranceBet > 0 && dealerHasBlackjack) {
+      const state = gameStore.getState();
+      gameStore.setState({ balance: state.balance + (insuranceBet * 3) });
+      gameStore.setMessage('Insurance pays 2:1!', 2000);
     }
 
     if (playerHasBlackjack && dealerHasBlackjack) {
-      endGame('push');
+      endGame(gameState.currentBet, 0, 'Push - Both blackjack');
     } else if (playerHasBlackjack) {
-      endGame('blackjack');
+      endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!');
     } else if (dealerHasBlackjack) {
-      endGame('dealer-blackjack');
+      endGame(0, 0, 'Dealer blackjack');
     }
   };
 
   const updateGameDisplay = () => {
     gameStore.setState({
-      playerHand: playerHand.getCards().map(card => card.toData()),
-      playerValue: playerHand.getValue(),
+      playerHand: hands[0]?.hand.getCards().map(card => card.toData()) || [],
+      playerValue: hands[0]?.hand.getValue() || 0,
       dealerHand: dealerHand.getCards().map(card => card.toData()),
       dealerValue: dealerHand.getValue()
     });
@@ -492,21 +561,25 @@ const GameContent: React.FC = () => {
           title="Dealer"
         />
 
-        <HandDisplay
-          cards={gameState.playerHand}
-          value={gameState.playerValue}
-          isCurrent={gameState.state === 'playing' && currentHand === 'main'}
-          title="Player"
-          balance={gameState.balance}
-          currentBet={gameState.currentBet}
-        />
-
-        {splitHand && (
+        {hands.length > 0 ? (
+          hands.map((handInfo, index) => (
+            <HandDisplay
+              key={index}
+              cards={handInfo.hand.getCards().map(card => card.toData())}
+              value={handInfo.hand.getValue()}
+              isCurrent={gameState.state === 'playing' && index === currentHandIndex && !handInfo.isCompleted}
+              title={index === 0 ? "Player" : `Split Hand ${index}`}
+              balance={index === 0 ? gameState.balance : undefined}
+              currentBet={index === 0 ? gameState.currentBet : undefined}
+            />
+          ))
+        ) : (
           <HandDisplay
-            cards={splitHand.getCards().map(card => card.toData())}
-            value={splitHand.getValue()}
-            isCurrent={gameState.state === 'playing' && currentHand === 'split'}
-            title="Split Hand"
+            cards={[]}
+            value={0}
+            title="Player"
+            balance={gameState.balance}
+            currentBet={gameState.currentBet}
           />
         )}
       </div>
@@ -522,8 +595,8 @@ const GameContent: React.FC = () => {
           gameState={gameState.state}
           balance={gameState.balance}
           currentBet={gameState.currentBet}
-          canSplit={canSplit}
-          hasHit={hasHit[currentHand]}
+          canSplit={canCurrentHandSplit()}
+          hasHit={hands[currentHandIndex]?.hasHit || false}
           onDealHand={dealHand}
           onHit={hit}
           onStand={stand}

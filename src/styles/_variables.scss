@@ -1,0 +1,43 @@
+// Color Variables
+$primary-green: #4caf50;
+$primary-green-hover: #45a049;
+$error-red: #f44336;
+$background-gradient: linear-gradient(135deg, #0f4c3a 0%, #2d5a4e 50%, #1a3b32 100%);
+
+// Size Variables
+$card-width: 7.5rem;
+$card-height: 10.625rem;
+$small-card-width: 3.75rem;
+$small-card-height: 5.3125rem;
+
+// Border Radius
+$border-radius: 0.9375rem;
+$card-border-radius: 0.75rem;
+
+// Spacing
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 0.625rem;
+$spacing-lg: 0.9375rem;
+$spacing-xl: 1.25rem;
+$spacing-xxl: 1.875rem;
+
+// Typography
+$font-size-sm: 0.875rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.25rem;
+$font-size-xxl: 1.5rem;
+$font-size-display: 2.5rem;
+
+// Mixins
+@mixin glass-effect {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(0.625rem);
+    border-radius: $border-radius;
+}
+
+@mixin button-hover {
+    transform: translateY(-0.125rem);
+    transition: all 0.3s ease;
+}

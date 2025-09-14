@@ -1,0 +1,54 @@
+@import '../styles/variables';
+
+// BettingControls Component Styles
+.betting-section {
+    h4 {
+        margin-bottom: $spacing-lg; // 15px -> 0.9375rem
+        font-size: $font-size-xl; // 20px -> 1.25rem
+        text-align: center;
+    }
+}
+
+.betting-controls {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-lg; // 15px -> 0.9375rem
+
+    .bet-buttons {
+        display: flex;
+        gap: $spacing-md; // 10px -> 0.625rem
+        justify-content: center;
+    }
+
+    .bet-input-row {
+        display: flex;
+        gap: $spacing-md; // 10px -> 0.625rem
+        align-items: center;
+    }
+
+    .custom-bet-input {
+        flex: 1;
+        padding: $spacing-md; // 10px -> 0.625rem
+        border: 0.0625rem solid rgba(255, 255, 255, 0.3); // 1px -> 0.0625rem
+        border-radius: 0.5rem; // 8px -> 0.5rem
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: $font-size-base;
+
+        &:focus {
+            outline: none;
+            border-color: $primary-green;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        &::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    .bet-buttons {
+        flex-direction: column;
+    }
+}

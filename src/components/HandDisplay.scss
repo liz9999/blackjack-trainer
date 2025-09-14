@@ -1,0 +1,77 @@
+@import '../styles/variables';
+
+// HandDisplay Component Styles
+.hand-display {
+    &.current-hand {
+        border: 0.125rem solid $primary-green; // 2px -> 0.125rem
+        border-radius: 0.5rem;                 // 8px -> 0.5rem
+        padding: 1rem;                         // 16px -> 1rem
+        position: relative;
+    }
+
+    &.default-hand {
+        border: 0.0625rem solid #ddd;         // 1px -> 0.0625rem
+        border-radius: 0.5rem;                // 8px -> 0.5rem
+        padding: 1rem;                        // 16px -> 1rem
+        position: relative;
+    }
+
+    .hand-title {
+        &.current {
+            color: #2E7D32;
+            font-weight: bold;
+        }
+    }
+
+    .active-indicator {
+        color: $primary-green;
+        font-size: $font-size-sm;             // 14px -> 0.875rem
+        font-weight: bold;
+        margin-left: 0.625rem;                // 10px -> 0.625rem
+    }
+}
+
+.player-section {
+    @include glass-effect;
+    padding: $spacing-xxl;                    // 30px -> 1.875rem
+    text-align: center;
+
+    h3 {
+        margin-bottom: $spacing-lg;           // 15px -> 0.9375rem
+        font-size: 1.4rem;                    // 1.4em -> 1.4rem
+        color: white;
+    }
+
+    .player-info {
+        margin-bottom: $spacing-xl;           // 20px -> 1.25rem
+        display: flex;
+        justify-content: center;
+        gap: $spacing-xl;                     // 20px -> 1.25rem
+        flex-wrap: wrap;
+
+        span {
+            font-weight: bold;
+            font-size: $font-size-lg;         // 1.1em -> 1.125rem
+        }
+    }
+}
+
+.hand-cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: $spacing-lg;                        // 15px -> 0.9375rem
+    flex-wrap: wrap;
+    min-height: 12.5rem;                     // 200px -> 12.5rem
+    padding: $spacing-xl;                    // 20px -> 1.25rem
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.625rem;                 // 10px -> 0.625rem
+    border: 0.125rem dashed rgba(255, 255, 255, 0.2); // 2px -> 0.125rem
+    transition: all 0.3s ease;
+
+    &.current-hand {
+        border-color: $primary-green;
+        background: rgba(76, 175, 80, 0.1);
+        box-shadow: 0 0 $spacing-lg rgba(76, 175, 80, 0.3); // 15px -> 0.9375rem
+    }
+}

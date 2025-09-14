@@ -1,5 +1,6 @@
 import React from 'react';
 import { CardData } from '../types/index.js';
+import './Card.scss';
 
 interface CardProps {
   card: CardData;

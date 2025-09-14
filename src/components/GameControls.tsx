@@ -1,5 +1,6 @@
 import React from 'react';
 import { GameState } from '../types/index.js';
+import './GameControls.scss';
 
 interface GameControlsProps {
   gameState: GameState;

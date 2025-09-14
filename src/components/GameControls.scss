@@ -1,0 +1,84 @@
+@import '../styles/variables';
+
+// GameControls Component Styles
+.game-controls {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md; // 10px -> 0.625rem
+
+    h4 {
+        margin-bottom: $spacing-lg; // 15px -> 0.9375rem
+        font-size: $font-size-xl; // 20px -> 1.25rem
+        text-align: center;
+    }
+
+    .primary-actions,
+    .secondary-actions {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-md; // 10px -> 0.625rem
+        margin-bottom: $spacing-lg; // 15px -> 0.9375rem
+    }
+
+    .primary-actions {
+        .btn.large {
+            padding: $spacing-lg $spacing-xxl; // 15px 30px -> 0.9375rem 1.875rem
+            font-size: $font-size-lg; // 18px -> 1.125rem
+        }
+    }
+}
+
+.btn {
+    padding: 0.75rem $spacing-xl; // 12px 20px -> 0.75rem 1.25rem
+    border: none;
+    border-radius: 0.5rem; // 8px -> 0.5rem
+    font-size: $font-size-base;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.03125rem; // 0.5px -> 0.03125rem
+
+    &.primary {
+        background: $primary-green;
+        color: white;
+
+        &:hover:not(:disabled) {
+            background: $primary-green-hover;
+            @include button-hover;
+        }
+    }
+
+    &.secondary {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 0.0625rem solid rgba(255, 255, 255, 0.3); // 1px -> 0.0625rem
+
+        &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            @include button-hover;
+        }
+    }
+
+    &.selected {
+        background: $primary-green;
+        color: white;
+        border: 0.125rem solid rgba(76, 175, 80, 0.8); // 2px -> 0.125rem
+        box-shadow: 0 0 $spacing-lg rgba(76, 175, 80, 0.4);
+
+        &:hover {
+            background: $primary-green-hover;
+        }
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+    }
+
+    &.small {
+        padding: 0.5rem $spacing-lg; // 8px 15px -> 0.5rem 0.9375rem
+        font-size: $font-size-sm; // 14px -> 0.875rem
+    }
+}

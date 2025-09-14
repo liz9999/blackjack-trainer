@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from './Card';
 import { CardData } from '../types/index.js';
+import './HandDisplay.scss';
 
 interface HandDisplayProps {
   cards: CardData[];
@@ -22,8 +23,11 @@ export const HandDisplay: React.FC<HandDisplayProps> = ({
   currentBet
 }) => {
   return (
-    <div className={`player-section ${isCurrent ? 'current-hand' : ''}`}>
-      <h3>{title}</h3>
+    <div className={`player-section hand-display ${isCurrent ? 'current-hand' : 'default-hand'}`}>
+      <h3 className={`hand-title ${isCurrent ? 'current' : ''}`}>
+        {title}
+        {isCurrent && <span className="active-indicator">← ACTIVE</span>}
+      </h3>
       <div className="player-info">
         <span>Hand Value: <span>{value}</span></span>
         {balance !== undefined && <span>Balance: $<span>{balance}</span></span>}

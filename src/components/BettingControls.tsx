@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { gameStore } from '../store.js';
+import './BettingControls.scss';
 
 interface BettingControlsProps {
   balance: number;
