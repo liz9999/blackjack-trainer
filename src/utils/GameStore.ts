@@ -27,7 +27,9 @@ export class GameStore {
                 decksRemaining: 6.0,
                 handsWon: 0,
                 totalHands: 0,
-                winRate: 0
+                winRate: 0,
+                playerBlackjacks: 0,
+                dealerBlackjacks: 0
             },
             countingPracticeEnabled: false,
             settingsOpen: false,

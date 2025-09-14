@@ -43,6 +43,14 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           <h4>Win Rate</h4>
           <div className="stat-value">{stats.winRate}%</div>
         </div>
+        <div className="stat-card">
+          <h4>Player Blackjacks</h4>
+          <div className="stat-value">{stats.playerBlackjacks}</div>
+        </div>
+        <div className="stat-card">
+          <h4>Dealer Blackjacks</h4>
+          <div className="stat-value">{stats.dealerBlackjacks}</div>
+        </div>
       </div>
     </div>
   );

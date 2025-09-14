@@ -18,6 +18,8 @@ export interface GameStats {
     handsWon: number;
     totalHands: number;
     winRate: number;
+    playerBlackjacks: number;
+    dealerBlackjacks: number;
 }
 
 export interface GameStateData {

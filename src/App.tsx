@@ -97,9 +97,9 @@ const GameContent: React.FC = () => {
 
       const dealerHasBlackjack = dealerHand.isBlackjack();
       if (dealerHasBlackjack) {
-        endGame(gameState.currentBet, 0, 'Push - Both blackjack');
+        endGame(gameState.currentBet, 0, 'Push - Both blackjack', true, true);
       } else {
-        endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!');
+        endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!', true, false);
       }
       return;
     } else if (dealerUpCard.rank === 'A') {
@@ -346,13 +346,21 @@ const GameContent: React.FC = () => {
     endGame(totalWinnings, handsWon, messages.join(' | '));
   };
 
-  const endGame = (winnings: number, handsWon: number, message: string) => {
+  const endGame = (winnings: number, handsWon: number, message: string, playerBlackjack = false, dealerBlackjack = false) => {
     const state = gameStore.getState();
     const newStats = { ...state.stats };
     newStats.totalHands++;
 
     if (handsWon > 0) {
       newStats.handsWon++;
+    }
+
+    if (playerBlackjack) {
+      newStats.playerBlackjacks++;
+    }
+
+    if (dealerBlackjack) {
+      newStats.dealerBlackjacks++;
     }
 
     newStats.winRate = newStats.totalHands > 0 ?
@@ -412,6 +420,8 @@ const GameContent: React.FC = () => {
         handsWon: 0,
         totalHands: 0,
         winRate: 0,
+        playerBlackjacks: 0,
+        dealerBlackjacks: 0,
         cardsRemaining: deck.getCardsRemaining(),
         decksRemaining: deck.getDecksRemaining()
       }
@@ -441,7 +451,7 @@ const GameContent: React.FC = () => {
       updateGameDisplay();
 
       setTimeout(() => {
-        endGame(state.currentBet, 1, 'Even money');
+        endGame(state.currentBet, 1, 'Even money', true, false);
       }, 1500);
       return;
     }
@@ -481,11 +491,11 @@ const GameContent: React.FC = () => {
     }
 
     if (playerHasBlackjack && dealerHasBlackjack) {
-      endGame(gameState.currentBet, 0, 'Push - Both blackjack');
+      endGame(gameState.currentBet, 0, 'Push - Both blackjack', true, true);
     } else if (playerHasBlackjack) {
-      endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!');
+      endGame(Math.floor(gameState.currentBet * 2.5), 1, 'Blackjack!', true, false);
     } else if (dealerHasBlackjack) {
-      endGame(0, 0, 'Dealer blackjack');
+      endGame(0, 0, 'Dealer blackjack', false, true);
     }
   };
 
